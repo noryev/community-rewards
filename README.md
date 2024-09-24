@@ -1,7 +1,4 @@
-# gpu-status-dashboard
-A network status page that tracks and displays the status of the GPU's attached to the Lilypad (Arbitrum) Network
-
-I am sorry Docker Gods, Ill return with a better initalization experience!
+#community-rewards
 
 ## run in development mode
 
