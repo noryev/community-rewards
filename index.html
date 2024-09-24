@@ -1,241 +1,218 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<title>Lilypad Community Rewards</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-<style>
-    :root {
-        --bg-color-dark: #000000;
-        --bg-color-light: #003d32;
-        --text-color: #e6f1ff;
-        --accent-color: #a7ffef;
-        --card-bg: rgba(0, 61, 50, 0.5);
-        --hover-color: rgba(0, 61, 50, 0.8);
-    }
-    body, html {
-        margin: 0;
-        padding: 0;
-        background: linear-gradient(135deg, var(--bg-color-dark), var(--bg-color-light));
-        color: var(--text-color);
-        font-family: 'Inter', sans-serif;
-        line-height: 1.6;
-        min-height: 100vh;
-    }
-    .container {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 2rem;
-    }
-    h1 {
-        text-align: center;
-        color: var(--accent-color);
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
-        text-shadow: 0 0 10px rgba(167, 255, 239, 0.5);
-    }
-    .controls {
-        display: flex;
-        justify-content: center;
-        margin-bottom: 2rem;
-    }
-    select {
-        background-color: var(--card-bg);
-        color: var(--text-color);
-        border: 1px solid var(--accent-color);
-        padding: 0.5rem 1rem;
-        font-size: 1rem;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    select:hover {
-        background-color: var(--hover-color);
-    }
-    .contributors-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 1.5rem;
-    }
-    .contributor-card {
-        background-color: var(--card-bg);
-        border-radius: 8px;
-        padding: 1.5rem;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        border: 1px solid rgba(167, 255, 239, 0.2);
-    }
-    .contributor-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-    }
-    .contributor-header {
-        display: flex;
-        align-items: center;
-        margin-bottom: 1rem;
-    }
-    .contributor-avatar {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        margin-right: 1rem;
-        border: 2px solid var(--accent-color);
-    }
-    .contributor-info h2 {
-        margin: 0;
-        font-size: 1.2rem;
-        color: var(--accent-color);
-    }
-    .contributor-info a {
-        color: var(--accent-color);
-        text-decoration: none;
-        opacity: 0.8;
-        transition: opacity 0.3s ease;
-    }
-    .contributor-info a:hover {
-        opacity: 1;
-    }
-    .contributor-stats {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 1rem;
-        font-size: 0.9rem;
-    }
-    .stat {
-        text-align: center;
-    }
-    .stat-value {
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: var(--accent-color);
-    }
-    .wallet-address {
-        font-size: 0.8rem;
-        color: rgba(167, 255, 239, 0.7);
-        word-break: break-all;
-        margin-top: 0.5rem;
-    }
-    .last-contribution {
-        font-size: 0.8rem;
-        color: rgba(167, 255, 239, 0.7);
-        margin-top: 0.5rem;
-    }
-</style>
+    <meta charset="UTF-8">
+    <title>Lilypad Community Rewards</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
-<div class="container">
-    <h1>Lilypad Community Rewards</h1>
-    <div class="controls">
-        <select id="sort-select">
-            <option value="rewards">Sort by Rewards</option>
-            <option value="date">Sort by Last Contribution Date</option>
-        </select>
+    <div class="container">
+        <div class="header-container">
+            <div class="heading">
+                <img src="/public/LilypadLogoWord.png" class="heading-img" alt="Lilypad Logo" />
+                <h1>Community Rewards</h1>
+            </div>
+            <select id="sort-select">
+                <option value="rewards">Sort by Rewards</option>
+                <option value="count">Sort by Contribution Count</option>
+                <option value="date">Sort by Last Contribution Date</option>
+            </select>
+        </div>
+        <div id="contributors-grid" class="contributors-grid"></div>
+        <div class="pagination-controls">
+            <button id="prev-page" disabled>Previous</button>
+            <span id="page-info"></span>
+            <button id="next-page">Next</button>
+        </div>
     </div>
-    <div id="contributors-grid" class="contributors-grid"></div>
-</div>
-<script>
-const csvUrl = 'https://raw.githubusercontent.com/noryev/community-rewards/main/community_rewards.csv';
-let contributors = [];
 
-async function fetchCsvData(url) {
-    const response = await fetch(url);
-    return await response.text();
-}
+    <script>
+        const ITEMS_PER_PAGE = 15;
+        let currentPage = 1;
+        let contributors = [];
+        let sortedContributors = [];
 
-function parseCsvData(csvText) {
-    const lines = csvText.trim().split('\n');
-    const headers = lines[0].split(',');
-    return lines.slice(1).map(line => {
-        const values = line.split(',');
-        return headers.reduce((obj, header, index) => {
-            let value = values[index] ? values[index].trim() : '';
-            if (header === 'contributions') {
-                value = value.split(';').map(v => v.trim());
-            } else if (header === 'rewards' && !isNaN(value)) {
-                value = parseFloat(value);
+        async function fetchLocalCsvData() {
+            try {
+                const response = await fetch('community_rewards.csv');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return await response.text();
+            } catch (error) {
+                console.error("Could not fetch local CSV file:", error);
+                throw error;
             }
-            obj[header.trim()] = value;
-            return obj;
-        }, {});
-    });
-}
+        }
 
-function getLastContributionDate(contributions) {
-    const dates = contributions.map(url => {
-        const match = url.match(/\/(\d{4}-\d{2}-\d{2})$/);
-        return match ? new Date(match[1]) : new Date(0);
-    });
-    return new Date(Math.max(...dates));
-}
+        function parseCsvData(csvText) {
+            const lines = csvText.trim().split('\n');
+            const headers = lines[0].split(',');
+            return lines.slice(1).map(line => {
+                const values = line.split(',');
+                return headers.reduce((obj, header, index) => {
+                    let value = values[index] ? values[index].trim() : '';
+                    if (header === 'contributions') {
+                        value = value.split(';').map(v => v.trim());
+                    } else if (header === 'rewards' && !isNaN(value)) {
+                        value = parseFloat(value);
+                    }
+                    obj[header.trim()] = value;
+                    return obj;
+                }, {});
+            });
+        }
 
-function formatDate(date) {
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    return date.toLocaleDateString(undefined, options);
-}
+        function getLastContributionDate(contributions) {
+            const dates = contributions.map(url => {
+                const match = url.match(/\/(\d{4}-\d{2}-\d{2})$/);
+                return match ? new Date(match[1]) : new Date(0);
+            });
+            return new Date(Math.max(...dates));
+        }
 
-function createContributorCard(contributor) {
-    const card = document.createElement('div');
-    card.className = 'contributor-card';
-    const lastContributionDate = getLastContributionDate(contributor.contributions);
-    card.innerHTML = `
-        <div class="contributor-header">
-            <img class="contributor-avatar" src="https://github.com/${contributor.github.split('/').pop()}.png" alt="${contributor.username}" onerror="this.src='https://github.com/github.png'">
-            <div class="contributor-info">
-                <h2>${contributor.username}</h2>
-                <a href="${contributor.github}" target="_blank">GitHub Profile</a>
+        function formatDate(date) {
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return date.toLocaleDateString(undefined, options);
+        }
+
+        function formatWalletAddress(address) {
+            if (!address) return '';
+            return `${address.slice(0, 8)}..${address.slice(-8)}`;
+        }
+
+        function createContributorCard(contributor) {
+            const card = document.createElement('div');
+            card.className = 'contributor-card';
+            const lastContributionDate = getLastContributionDate(contributor.contributions);
+
+            const walletHTML = contributor.wallet_address ? `
+        <div class="wallet-container">
+            <div class="wallet-info">
+                <span class="wallet-label">Wallet:</span>
+                <span class="wallet-address" title=${contributor.wallet_address}>${formatWalletAddress(contributor.wallet_address)}</span>
             </div>
+            <button class="copy-button" data-wallet="${contributor.wallet_address}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+            </button>
         </div>
-        <div class="contributor-stats">
-            <div class="stat">
-                <div class="stat-value">${typeof contributor.rewards === 'number' ? contributor.rewards.toFixed(2) : contributor.rewards}</div>
-                <div>Lillybit Rewards</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">${contributor.contributions.length}</div>
-                <div>Contributions</div>
-            </div>
-        </div>
-        ${contributor.wallet_address ? `<div class="wallet-address">Wallet: ${contributor.wallet_address}</div>` : ''}
-        <div class="last-contribution">Last Contribution: ${formatDate(lastContributionDate)}</div>
-    `;
-    return card;
-}
+    ` : '';
 
-function sortContributors(sortBy) {
-    if (sortBy === 'rewards') {
-        contributors.sort((a, b) => b.rewards - a.rewards);
-    } else if (sortBy === 'date') {
-        contributors.sort((a, b) => {
-            const dateA = getLastContributionDate(a.contributions);
-            const dateB = getLastContributionDate(b.contributions);
-            return dateB - dateA;
-        });
-    }
-    renderContributors();
-}
+            card.innerHTML = `
+                <div class="contributor-header">
+                    <img class="contributor-avatar" src="https://github.com/${contributor.github.split('/').pop()}.png" alt="${contributor.username}" onerror="this.src='https://github.com/github.png'">
+                    <div class="contributor-info">
+                        <h2>${contributor.username}</h2>
+                        <a href="${contributor.github}" target="_blank">GitHub Profile</a>
+                    </div>
+                </div>
+                <div class="contributor-stats">
+                    <div class="stat">
+                        <div class="stat-value">${typeof contributor.rewards === 'number' ? contributor.rewards.toFixed(2) : contributor.rewards}</div>
+                        <div>Lillybit Rewards</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">${contributor.contributions.length}</div>
+                        <div>Contributions</div>
+                    </div>
+                </div>
+                ${walletHTML}
+                <div class="last-contribution">Last Contribution: ${formatDate(lastContributionDate)}</div>
+            `;
 
-function renderContributors() {
-    const grid = document.getElementById('contributors-grid');
-    grid.innerHTML = '';
-    contributors.forEach(contributor => {
-        grid.appendChild(createContributorCard(contributor));
-    });
-}
+            const copyButton = card.querySelector('.copy-button');
+            if (copyButton) {
+                copyButton.addEventListener('click', function () {
+                    const walletAddress = this.getAttribute('data-wallet');
+                    navigator.clipboard.writeText(walletAddress).then(() => {
+                        this.classList.add('copied');
+                        setTimeout(() => this.classList.remove('copied'), 2000);
+                    });
+                });
+            }
 
-async function initializeDashboard() {
-    try {
-        const csvData = await fetchCsvData(csvUrl);
-        contributors = parseCsvData(csvData);
-        sortContributors('rewards'); // Initial sort by rewards
-        
-        document.getElementById('sort-select').addEventListener('change', (e) => {
-            sortContributors(e.target.value);
-        });
-    } catch (error) {
-        console.error('Error loading data:', error);
-        document.getElementById('contributors-grid').innerHTML = '<p>Error loading data. Please try again later.</p>';
-    }
-}
+            return card;
+        }
 
-initializeDashboard();
-</script>
+        function sortContributors(sortBy) {
+            if (sortBy === 'rewards') {
+                sortedContributors = [...contributors].sort((a, b) => b.rewards - a.rewards);
+            } else if (sortBy === 'date') {
+                sortedContributors = [...contributors].sort((a, b) => {
+                    const dateA = getLastContributionDate(a.contributions);
+                    const dateB = getLastContributionDate(b.contributions);
+                    return dateB - dateA;
+                });
+            } else if (sortBy === 'count') {
+                sortedContributors = [...contributors].sort((a, b) => b.contributions.length - a.contributions.length);
+            }
+            currentPage = 1;
+            renderContributors();
+            updatePaginationControls();
+        }
+
+        function renderContributors() {
+            const grid = document.getElementById('contributors-grid');
+            grid.innerHTML = '';
+            const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+            const endIndex = startIndex + ITEMS_PER_PAGE;
+            const pageContributors = sortedContributors.slice(startIndex, endIndex);
+            pageContributors.forEach(contributor => {
+                grid.appendChild(createContributorCard(contributor));
+            });
+        }
+
+        function updatePaginationControls() {
+            const prevButton = document.getElementById('prev-page');
+            const nextButton = document.getElementById('next-page');
+            const pageInfo = document.getElementById('page-info');
+
+            prevButton.disabled = currentPage === 1;
+            nextButton.disabled = currentPage === Math.ceil(sortedContributors.length / ITEMS_PER_PAGE);
+
+            pageInfo.textContent = `Page ${currentPage} of ${Math.ceil(sortedContributors.length / ITEMS_PER_PAGE)}`;
+        }
+
+        function changePage(direction) {
+            if (direction === 'next' && currentPage < Math.ceil(sortedContributors.length / ITEMS_PER_PAGE)) {
+                currentPage++;
+            } else if (direction === 'prev' && currentPage > 1) {
+                currentPage--;
+            }
+            renderContributors();
+            updatePaginationControls();
+        }
+
+        async function initializeDashboard() {
+            try {
+                const csvData = await fetchLocalCsvData();
+                contributors = parseCsvData(csvData);
+                sortContributors('rewards'); // Initial sort by rewards
+
+                document.getElementById('sort-select').addEventListener('change', (e) => {
+                    sortContributors(e.target.value);
+                });
+
+                document.getElementById('prev-page').addEventListener('click', () => changePage('prev'));
+                document.getElementById('next-page').addEventListener('click', () => changePage('next'));
+
+                updatePaginationControls();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('contributors-grid').innerHTML = '<p>Error loading data. Please try again later.</p>';
+            }
+        }
+
+        initializeDashboard();
+    </script>
 </body>
+
 </html>
