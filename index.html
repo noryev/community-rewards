@@ -12,23 +12,58 @@
 
 <body>
     <div class="container">
-        <div class="header-container">
-            <div class="heading">
-                <img src="/public/LilypadLogoWord.png" class="heading-img" alt="Lilypad Logo" />
-                <h1>Community Rewards</h1>
+        <div class="table rounded-xl overflow-hidden border-secondary">
+            <div class="header-container">
+                <div class="header-content">
+                    <img src="./public/lilypad-logo.svg" alt="Lilypad Logo" />
+                    <h4 class="header-title">Open Source Rewards</h4>
+                </div>
+                <div class="sort-container">
+                    <div class="card-content">
+                        <div id="contribution-count" class="card-title">Loading...</div>
+                    </div>
+                    <select id="sort-select" class="sort-select">
+                        <option value="rewards">Sort by Rewards</option>
+                        <option value="count">Sort by Contribution Count</option>
+                    </select>
+                </div>
             </div>
-            <select id="sort-select">
-                <option value="rewards">Sort by Rewards</option>
-                <option value="count">Sort by Contribution Count</option>
-                <option value="date">Sort by Last Contribution Date</option>
-            </select>
+            <div class="table-container">
+                <table class="contributors-table">
+                    <thead>
+                        <tr>
+                            <th>Contributor</th>
+                            <th>Lilybit_ rewards</th>
+                            <th>Contributions</th>
+                            <th>Wallet ID</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contributors-grid">
+                        <!-- Contributor rows will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination-controls">
+                <button id="prev-page" disabled>Previous</button>
+                <span id="page-info"></span>
+                <button id="next-page">Next</button>
+            </div>
         </div>
-        <div id="contributors-grid" class="contributors-grid"></div>
-        <div class="pagination-controls">
-            <button id="prev-page" disabled>Previous</button>
-            <span id="page-info"></span>
-            <button id="next-page">Next</button>
-        </div>
+        <footer class="footer">
+            <div class="socials">
+                <!-- Social icons go here -->
+            </div>
+            <div class="cta">
+                <div class="cta-text">
+                    <h3 class="cta-title">Get involved!</h3>
+                    <p class="cta-subtitle">Join the Lilypad open source initiative now.</p>
+                </div>
+                <a href="https://blog.lilypadnetwork.org/lilypad-launches-open-source-initiative-as-part-of-incentivenet"
+                    target="_blank" rel="noopener noreferrer" class="cta-button">
+                    Find out more!
+                </a>
+            </div>
+        </footer>
     </div>
 
     <script>
@@ -36,6 +71,17 @@
         let currentPage = 1;
         let contributors = [];
         let sortedContributors = [];
+        let contributorCount = 0;
+        let totalContributions = 0;
+
+        const socialLinks = [
+            { href: "https://twitter.com/lilypad_tech", iconUrl: "./public/x.svg" },
+            { href: "https://discord.gg/lilypad-network", iconUrl: "./public/discord.svg" },
+            { href: "https://t.me/lilypadnetwork", iconUrl: "./public/telegram.svg" },
+            { href: "https://github.com/Lilypad-Tech", iconUrl: "./public/github.svg" },
+            { href: "https://www.linkedin.com/company/lilypad-network/", iconUrl: "./public/linkedin.svg" },
+            { href: "https://www.youtube.com/@LilypadNetwork/featured", iconUrl: "./public/youtube.svg" }
+        ];
 
         async function fetchLocalCsvData() {
             try {
@@ -53,12 +99,15 @@
         function parseCsvData(csvText) {
             const lines = csvText.trim().split('\n');
             const headers = lines[0].split(',');
+            contributorCount = lines.length - 1; // Subtract 1 to exclude the header row
+            totalContributions = 0; // Reset total contributions
             return lines.slice(1).map(line => {
                 const values = line.split(',');
                 return headers.reduce((obj, header, index) => {
                     let value = values[index] ? values[index].trim() : '';
                     if (header === 'contributions') {
                         value = value.split(';').map(v => v.trim());
+                        totalContributions += value.length; // Add to total contributions
                     } else if (header === 'rewards' && !isNaN(value)) {
                         value = parseFloat(value);
                     }
@@ -68,89 +117,67 @@
             });
         }
 
-        function getLastContributionDate(contributions) {
-            const dates = contributions.map(url => {
-                const match = url.match(/\/(\d{4}-\d{2}-\d{2})$/);
-                return match ? new Date(match[1]) : new Date(0);
-            });
-            return new Date(Math.max(...dates));
-        }
-
-        function formatDate(date) {
-            const options = { year: 'numeric', month: 'long', day: 'numeric' };
-            return date.toLocaleDateString(undefined, options);
-        }
-
         function formatWalletAddress(address) {
             if (!address) return '';
             return `${address.slice(0, 8)}..${address.slice(-8)}`;
         }
 
-        function createContributorCard(contributor) {
-            const card = document.createElement('div');
-            card.className = 'contributor-card';
-            const lastContributionDate = getLastContributionDate(contributor.contributions);
+        function createContributorRow(contributor) {
+            const row = document.createElement('tr');
 
-            const walletHTML = contributor.wallet_address ? `
-        <div class="wallet-container">
-            <div class="wallet-info">
-                <span class="wallet-label">Wallet:</span>
-                <span class="wallet-address" title=${contributor.wallet_address}>${formatWalletAddress(contributor.wallet_address)}</span>
-            </div>
-            <button class="copy-button" data-wallet="${contributor.wallet_address}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                </svg>
-            </button>
-        </div>
-    ` : '';
-
-            card.innerHTML = `
-                <div class="contributor-header">
-                    <img class="contributor-avatar" src="https://github.com/${contributor.github.split('/').pop()}.png" alt="${contributor.username}" onerror="this.src='https://github.com/github.png'">
+            row.innerHTML = `
+                <td>
                     <div class="contributor-info">
-                        <h2>${contributor.username}</h2>
-                        <a href="${contributor.github}" target="_blank">GitHub Profile</a>
+                        <img class="contributor-avatar" src="https://github.com/${contributor.github.split('/').pop()}.png" alt="${contributor.username}" onerror="this.src='https://github.com/github.png'">
+                        <div>
+                            <div class="contributor-name">${contributor.username}</div>
+                            <a href="${contributor.github}" target="_blank" class="github-link">GitHub Profile</a>
+                        </div>
                     </div>
-                </div>
-                <div class="contributor-stats">
-                    <div class="stat">
-                        <div class="stat-value">${typeof contributor.rewards === 'number' ? contributor.rewards.toFixed(2) : contributor.rewards}</div>
-                        <div>Lillybit Rewards</div>
-                    </div>
-                    <div class="stat">
-                        <div class="stat-value">${contributor.contributions.length}</div>
-                        <div>Contributions</div>
-                    </div>
-                </div>
-                ${walletHTML}
-                <div class="last-contribution">Last Contribution: ${formatDate(lastContributionDate)}</div>
+                </td>
+                <td>${typeof contributor.rewards === 'number' ? contributor.rewards.toFixed(2) : contributor.rewards}</td>
+                <td>${contributor.contributions.length}</td>
+                <td>
+                    ${contributor.wallet_address ? `
+                        <div class="wallet-info">
+                            <span class="wallet-address" title="${contributor.wallet_address}">${formatWalletAddress(contributor.wallet_address)}</span>
+                            <div class="copy-button" data-wallet="${contributor.wallet_address}">
+                                <svg class="clipboard-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                </svg>
+                                <svg class="checkmark-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </div>
+                        </div>
+                    ` : 'N/A'}
+                </td>
             `;
 
-            const copyButton = card.querySelector('.copy-button');
+            const copyButton = row.querySelector('.copy-button');
             if (copyButton) {
                 copyButton.addEventListener('click', function () {
                     const walletAddress = this.getAttribute('data-wallet');
                     navigator.clipboard.writeText(walletAddress).then(() => {
                         this.classList.add('copied');
-                        setTimeout(() => this.classList.remove('copied'), 2000);
+                        this.querySelector('.clipboard-icon').style.display = 'none';
+                        this.querySelector('.checkmark-icon').style.display = 'block';
+                        setTimeout(() => {
+                            this.classList.remove('copied');
+                            this.querySelector('.clipboard-icon').style.display = 'block';
+                            this.querySelector('.checkmark-icon').style.display = 'none';
+                        }, 2000);
                     });
                 });
             }
 
-            return card;
+            return row;
         }
 
         function sortContributors(sortBy) {
             if (sortBy === 'rewards') {
                 sortedContributors = [...contributors].sort((a, b) => b.rewards - a.rewards);
-            } else if (sortBy === 'date') {
-                sortedContributors = [...contributors].sort((a, b) => {
-                    const dateA = getLastContributionDate(a.contributions);
-                    const dateB = getLastContributionDate(b.contributions);
-                    return dateB - dateA;
-                });
             } else if (sortBy === 'count') {
                 sortedContributors = [...contributors].sort((a, b) => b.contributions.length - a.contributions.length);
             }
@@ -166,7 +193,7 @@
             const endIndex = startIndex + ITEMS_PER_PAGE;
             const pageContributors = sortedContributors.slice(startIndex, endIndex);
             pageContributors.forEach(contributor => {
-                grid.appendChild(createContributorCard(contributor));
+                grid.appendChild(createContributorRow(contributor));
             });
         }
 
@@ -178,7 +205,7 @@
             prevButton.disabled = currentPage === 1;
             nextButton.disabled = currentPage === Math.ceil(sortedContributors.length / ITEMS_PER_PAGE);
 
-            pageInfo.textContent = `Page ${currentPage} of ${Math.ceil(sortedContributors.length / ITEMS_PER_PAGE)}`;
+            pageInfo.textContent = `${currentPage} of ${Math.ceil(sortedContributors.length / ITEMS_PER_PAGE)}`;
         }
 
         function changePage(direction) {
@@ -195,10 +222,28 @@
             try {
                 const csvData = await fetchLocalCsvData();
                 contributors = parseCsvData(csvData);
+                // Update the total contributions count display
+                document.getElementById('contribution-count').textContent = `Total contributions: ${totalContributions.toString()}`;
+
                 sortContributors('rewards'); // Initial sort by rewards
 
                 document.getElementById('sort-select').addEventListener('change', (e) => {
                     sortContributors(e.target.value);
+                });
+
+                const socialsDiv = document.querySelector('.socials');
+
+                socialLinks.forEach(link => {
+                    const anchor = document.createElement('a');
+                    anchor.href = link.href;
+                    anchor.target = '_blank'; // Open link in new tab
+
+                    const img = document.createElement('img');
+                    img.src = link.iconUrl;
+                    img.alt = 'social icon'; // Set alt text for accessibility
+
+                    anchor.appendChild(img);
+                    socialsDiv.appendChild(anchor);
                 });
 
                 document.getElementById('prev-page').addEventListener('click', () => changePage('prev'));
@@ -207,7 +252,8 @@
                 updatePaginationControls();
             } catch (error) {
                 console.error('Error loading data:', error);
-                document.getElementById('contributors-grid').innerHTML = '<p>Error loading data. Please try again later.</p>';
+                document.getElementById('contributors-grid').innerHTML = '<tr><td colspan="4">Error loading data. Please try again later.</td></tr>';
+                document.getElementById('contribution-count').textContent = 'Error loading count';
             }
         }
 
